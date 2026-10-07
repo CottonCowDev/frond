@@ -76,7 +76,8 @@ Notes behave like physical cards in an office filing system:
   <img src=".github/assets/screenshot(2).png" alt="Frond Screen 2" width="31%"/>
   <img src=".github/assets/screenshot(3).png" alt="Frond Screen 3" width="31%"/>
 </p>
----
+
+----
 
 ### Also under the hood
 
