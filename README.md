@@ -68,6 +68,15 @@ Notes behave like physical cards in an office filing system:
 *   **Slide behind:** Drop a note onto another and it collapses into a slim tab (a small handle with a keyword label pulled automatically from its text) that peeks out above the stack. Click the tab to bring that note to the front.
 *   **Pull the card:** Grab a tab and pull it upward. The card **lifts 30 px** like it is coming out of a catalog drawer, and slides back into place if you let go.
 *   **Rip it out:** Keep pulling past **60 px** and the card tears free with a quick 100 ms snap. It instantly becomes an independent, free-floating note right under your cursor.
+---
+  ## Screenshots
+
+<p align="center" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+  <img src=".github/assets/screenshot1.png" alt="Frond Screen 1" width="31%"/>
+  <img src=".github/assets/screenshot2.png" alt="Frond Screen 2" width="31%"/>
+  <img src=".github/assets/screenshot3.png" alt="Frond Screen 3" width="31%"/>
+</p>
+---
 
 ### Also under the hood
 
@@ -152,13 +161,7 @@ Frond is split across **two repositories** to keep each one honest:
 Everything build-related (`dist/`, `node_modules/`, `*.exe`) is git-ignored. If you ever see a binary in a pull request here, it gets sent back.
 
 ---
-## Screenshots
 
-<p align="center">
-  <img src=".github/assets/screenshot.png" alt="Frond Application Screenshot" width="600"/>
-</p>
-
----
 ## Contributing
 
 Issues and pull requests are welcome. Keep it small, keep it local-first, and keep it fast. A change that adds a network call, an account or a telemetry ping is not going to be merged.
