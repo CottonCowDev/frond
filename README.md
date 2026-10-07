@@ -74,7 +74,7 @@ Notes behave like physical cards in an office filing system:
 *   **Pastel highlighter wheel:** Hold the `H` button for 500 ms and a circular menu fans out with Classic Yellow, Soft Orange, and Pastel Pink options.
 *   **Crash-proof storage:** Notes are saved securely by writing to a temporary file before replacing the original, backed up by a rolling `.bak` file and a plain-text `.txt` mirror of every note. If your computer loses power mid-sentence, every note returns to its exact coordinates on the next launch.
 *   **Native export:** A single click opens your operating system's official "Save as" dialog, letting you save your note as a standard `.txt` file anywhere you like.
-*   **Premium finish:** Enjoy smooth rounded corners, frosted glass effects, precise shadows, moss and emerald accents, alongside smooth animations for minimizing and restoring your workspace.
+*   **Premium finish:** Enjoy smooth rounded corners, frosted glass effects, precise shadows, alongside smooth animations for calmer and more precise workplace
   
 ---
 
