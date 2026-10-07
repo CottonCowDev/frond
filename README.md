@@ -2,6 +2,7 @@
 
 <img src=".github/assets/logo.png" alt="Frond logo" width="160" />
 
+
 # Frond
 
 **Sticky notes that stay on your machine, stay out of your way, and don't ask you to sign in.**
@@ -151,7 +152,13 @@ Frond is split across **two repositories** to keep each one honest:
 Everything build-related (`dist/`, `node_modules/`, `*.exe`) is git-ignored. If you ever see a binary in a pull request here, it gets sent back.
 
 ---
+## Screenshots
 
+<p align="center">
+  <img src=".github/assets/screenshot.png" alt="Frond Application Screenshot" width="600"/>
+</p>
+
+---
 ## Contributing
 
 Issues and pull requests are welcome. Keep it small, keep it local-first, and keep it fast. A change that adds a network call, an account or a telemetry ping is not going to be merged.
