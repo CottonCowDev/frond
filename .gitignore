@@ -1,0 +1,19 @@
+node_modules/
+dist/
+*.exe
+bunker_data/
+notes.json*
+.env
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# logs
+npm-debug.log*
+*.log
+
+# editor
+.vscode/
+.idea/
