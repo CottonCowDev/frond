@@ -72,9 +72,9 @@ Notes behave like physical cards in an office filing system:
   ## Screenshots
 
 <p align="center" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-  <img src=".github/assets/screenshot1.png" alt="Frond Screen 1" width="31%"/>
-  <img src=".github/assets/screenshot2.png" alt="Frond Screen 2" width="31%"/>
-  <img src=".github/assets/screenshot3.png" alt="Frond Screen 3" width="31%"/>
+  <img src=".github/assets/screenshot.png" alt="Frond Screen 1" width="31%"/>
+  <img src=".github/assets/screenshot(2).png" alt="Frond Screen 2" width="31%"/>
+  <img src=".github/assets/screenshot(3).png" alt="Frond Screen 3" width="31%"/>
 </p>
 ---
 
