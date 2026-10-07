@@ -22,18 +22,18 @@
 
 ## The Manifesto
 
-Your sticky notes are a scrap of text you want to see **right now**. They don't need an account, a sync service, a settings page, or a server in a data center to remember "call Martin back".
+When you open a sticky note, you just want to see your text **right now**. You shouldn't need an account, a sync service, or a distant server just to remember to "call Martin back."
 
 Most note apps are built the other way around: sign in, sync, update, sign in again. Frond is built on a simpler idea:
 
-> **A note is a file on your disk and a rectangle on your screen. Everything else is overhead.**
+> **A note is a file on your drive and a rectangle on your screen. Everything else is overhead.**
 
-- **Absolute local privacy.** Notes live in a single folder on your machine. There is no account and no cloud.
-- **Zero sync, zero telemetry.** Frond's code ships no analytics and makes no network requests. Don't take my word for it: read the source and `grep` for it. It's a few files.
-- **Raw native speed.** Frameless, transparent, hardware-accelerated. Notes appear when you launch the app and they're already where you left them.
-- **Built for heavy multitaskers.** Ten notes or fifty, Frond is designed to stay out of your taskbar and out of your way.
+*   **Absolute local privacy.** Notes live in a single folder on your machine. There is no account and no cloud.
+*   **Zero sync, zero tracking.** Frond's code includes no analytics and makes no network requests. You can verify this yourself by checking the source files. 
+*   **Raw native speed.** Frameless, transparent, and hardware-accelerated. Notes appear instantly when you launch the app, right where you left them.
+*   **Built for heavy multitaskers.** Whether you have ten notes or fifty, Frond is designed to stay out of your taskbar and out of your way.
 
-Frond is for people who keep a dozen things open at once and want their notes to be as fast as a Post-it.
+Frond is for people who keep a dozen things open at once and want their notes to be as fast as a physical Post-it.
 
 ---
 
@@ -41,41 +41,41 @@ Frond is for people who keep a dozen things open at once and want their notes to
 
 ### 🌿 Active Focus Shadow & Ecosystem Blur
 
-Frond notices when you type and uses that to protect your focus.
+Frond notices when you type and uses that behavior to protect your focus.
 
-- The moment you start typing, the active note **lifts toward you**. Its shadow deepens from `0 12px 40px` to `0 24px 70px`, and it gets a `1.015` micro-scale, animated over 0.4 s on a hand-tuned ease-out curve.
-- **Every other note** dims and heavy-blurs (`blur(40px)`, reduced opacity), so the one place you're writing is the only thing that reads as sharp.
-- When you stop for **800 ms**, the active note settles back to rest and the rest of the ecosystem restores itself.
-- It costs almost nothing. Frond sends **one** IPC message per typing burst, not one per keystroke. The main process keeps a single "who is typing" owner, so handoffs between notes can't race. A late "stopped" from the note you just left is ignored.
-- It handles real keyboards: dead keys, IME input, and **AltGr** (the `@ # { } \` keys on Czech layouts) all count as typing. Shortcuts like `Ctrl+B` don't.
+*   The moment you start typing, the active note **lifts toward you**. Its shadow deepens from `0 12px 40px` to `0 24px 70px`, and it scales up slightly by `1.015` using a smooth 0.4-second animation.
+*   **Every other note** dims and blurs heavily (`blur(40px)` with reduced opacity), making the exact place you are writing the only sharp object on your screen.
+*   When you stop typing for **800 ms**, the active note settles back down and the rest of your notes return to normal.
+*   This feature is highly optimized. Frond sends **one** background communication message per typing burst, not one per keystroke. The main background process tracks a single active note, ensuring smooth handoffs without visual glitches.
+*   It supports international keyboards: dead keys, special input methods, and **AltGr** modifiers (like the `@ # { } \` keys on European layouts) all count as typing. Keyboard shortcuts like `Ctrl+B` do not.
 
 ### 👻 The Ghost Host: 1 to 50 notes, ONE taskbar icon
 
-Window spam is what kills sticky-note apps on Windows. Frond solves it at the architecture level:
+Window clutter is what ruins most sticky-note apps. Frond solves this problem directly through its core architecture:
 
-- A single invisible 1×1 transparent **Ghost Host** window is the *only* window that owns a taskbar button.
-- Every note is a frameless, transparent window **owned by the host** with `skipTaskbar: true`. Open 1 note or 50 and the taskbar shows exactly **one clean icon**. No grouped previews, no thumbnail stack.
-- **Minimize** hides every note in one pass and parks the host in the taskbar. **Click the icon** and every note bursts back on a shared clock, in the same frame.
-- A note window can't be closed by accident. `Alt+F4` is blocked, and a note only leaves your desk through an explicit **Delete note**.
-- Running a second copy of Frond just raises the first one. Two instances never fight over your data.
+*   A single invisible 1×1 transparent **Ghost Host** window is the *only* window that creates a taskbar button.
+*   Every note is a frameless, transparent window **owned by this host** that hides itself from the taskbar. Open 1 note or 50, and your taskbar shows exactly **one clean icon**. There are no grouped previews or massive stacks of thumbnails.
+*   **Minimizing** hides every note instantly and parks the main host in the taskbar. **Clicking the icon** brings every note bursting back into view simultaneously.
+*   A note window cannot be closed by accident. Standard exit shortcuts like `Alt+F4` are blocked, meaning a note only leaves your desktop when you explicitly choose to **Delete note**.
+*   Opening a second copy of Frond simply brings the existing instance to the front. The two versions will never conflict or fight over your data.
 
 ### 🗂️ Mechanical Card Index Physics
 
-Notes behave like cards in an office card catalog:
+Notes behave like physical cards in an office filing system:
 
-- **Stack:** drag a note against the top edge of another and it snaps into a flush column.
-- **Slide behind:** drop a note onto another and it collapses into a slim tab (a pill handle plus a keyword label pulled from its own text) that peeks out above the stack. Click the tab to bring that note to the front.
-- **Pull the card:** grab a tab and pull it up. The card **lifts 30 px** like it's coming out of a catalog drawer, and it slides back if you let go.
-- **Rip it out:** keep pulling past **60 px** and the card tears free with a quick 100 ms snap. It becomes an independent, free-floating note under your cursor.
+*   **Stack:** Drag a note against the top edge of another and it snaps into a perfectly aligned column.
+*   **Slide behind:** Drop a note onto another and it collapses into a slim tab (a small handle with a keyword label pulled automatically from its text) that peeks out above the stack. Click the tab to bring that note to the front.
+*   **Pull the card:** Grab a tab and pull it upward. The card **lifts 30 px** like it is coming out of a catalog drawer, and slides back into place if you let go.
+*   **Rip it out:** Keep pulling past **60 px** and the card tears free with a quick 100 ms snap. It instantly becomes an independent, free-floating note right under your cursor.
 
 ### Also under the hood
 
-- **Word-style rich text** (bold, underline, highlighter) built on the native Selection and Range APIs, with no deprecated `execCommand`. Toggling at the caret works the way you'd expect.
-- **Pastel highlighter wheel:** hold the `H` button for 500 ms and a radial menu fans out with Classic Yellow, Soft Orange and Pastel Pink.
-- **Crash-proof storage:** notes are saved atomically (temp file, `fsync`, rename), with a rolling `.bak` and a plain-text `.txt` mirror of every note. If the PC loses power mid-sentence, every note comes back at the same coordinates on next launch.
-- **Native export:** one click opens the real OS "Save as" dialog and writes your note to a standard `.txt` file anywhere you like.
-- **Apple-grade finish:** squircle corners, frosted glass, precise shadows, moss/emerald accents, a vacuum-style minimize and burst-back animation.
-
+*   **Word-style rich text** (bold, underline, highlighter) built on modern native web standards, avoiding outdated code mechanisms. Toggling styles at your cursor works exactly the way you expect.
+*   **Pastel highlighter wheel:** Hold the `H` button for 500 ms and a circular menu fans out with Classic Yellow, Soft Orange, and Pastel Pink options.
+*   **Crash-proof storage:** Notes are saved securely by writing to a temporary file before replacing the original, backed up by a rolling `.bak` file and a plain-text `.txt` mirror of every note. If your computer loses power mid-sentence, every note returns to its exact coordinates on the next launch.
+*   **Native export:** A single click opens your operating system's official "Save as" dialog, letting you save your note as a standard `.txt` file anywhere you like.
+*   **Premium finish:** Enjoy smooth rounded corners, frosted glass effects, precise shadows, moss and emerald accents, alongside smooth animations for minimizing and restoring your workspace.
+  
 ---
 
 ## Where your data lives
