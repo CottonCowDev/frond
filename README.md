@@ -12,11 +12,9 @@
 
 ### [⬇&nbsp;&nbsp;Download Frond for Windows](https://cottoncowdev.github.io)
 
-*An indie project by **CottonCow Studio***
+*An indie project by **CottonCowDev***
 
 <br />
-
-<img src=".github/assets/screenshot.png" alt="Frond in action: glass notes with an active focus shadow" width="860" />
 
 </div>
 
@@ -164,6 +162,6 @@ Issues and pull requests are welcome. Keep it small, keep it local-first, and ke
 
 <div align="center">
 
-<sub>Made with stubbornness, coffee and a strong opinion about taskbars.</sub>
+<sub>Made in 72 hours as a hate letter towards Microsoft</sub>
 
 </div>
