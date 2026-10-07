@@ -1,0 +1,924 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self' 'unsafe-inline'"
+    />
+    <title>Sticky Note</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body data-state="free">
+    <!-- full note: the rounded, blurred, shadowed outermost container -->
+    <div class="note" id="note">
+      <!-- top bar: [pill] dead-center | right group: [⋮] [+] [export] [−] -->
+      <div class="handle">
+        <div class="pill" id="pill"></div>
+        <div class="controls">
+          <button class="ctl" id="menu-btn" aria-label="Menu" tabindex="-1">
+            ⋮
+          </button>
+          <button class="ctl" id="add-btn" aria-label="New note" tabindex="-1">
+            +
+          </button>
+          <button class="ctl" id="export-btn" aria-label="Export" tabindex="-1">
+            <svg
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M8 2v8"></path>
+              <path d="M5 7.5l3 3 3-3"></path>
+              <path d="M2.5 11v1.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V11"></path>
+            </svg>
+          </button>
+          <button class="ctl" id="min-btn" aria-label="Minimize" tabindex="-1">
+            −
+          </button>
+        </div>
+      </div>
+
+      <div class="menu" id="menu" hidden>
+        <button data-theme-opt="light">
+          <span class="tick">✓</span>Light Mode
+        </button>
+        <button data-theme-opt="dark">
+          <span class="tick">✓</span>Dark Mode
+        </button>
+        <div class="sep"></div>
+        <button data-action="behind" class="only-docked">
+          <span class="tick"></span>Send behind
+        </button>
+        <button data-action="delete" class="danger">
+          <span class="tick"></span>Delete note
+        </button>
+      </div>
+
+      <div
+        class="editor"
+        id="editor"
+        contenteditable="true"
+        spellcheck="false"
+        data-placeholder="Write something…"
+      ></div>
+
+      <div class="toolbar" id="toolbar">
+        <button data-cmd="bold" aria-label="Bold" tabindex="-1">
+          <b>B</b>
+        </button>
+        <button data-cmd="underline" aria-label="Underline" tabindex="-1">
+          <u>U</u>
+        </button>
+        <span class="hl-wrap">
+          <button class="hl" id="hl-btn" aria-label="Highlight" tabindex="-1">
+            H
+          </button>
+          <div class="radial" id="radial">
+            <svg id="radial-svg" viewBox="0 0 132 66"></svg>
+          </div>
+        </span>
+      </div>
+    </div>
+
+    <!-- collapsed "behind" tab: drag its pill up to pull the card out -->
+    <div class="tab" id="tab">
+      <span class="pill"></span>
+      <span class="label" id="label">note</span>
+    </div>
+
+    <script>
+      const { ipcRenderer } = require("electron");
+      const id = new URLSearchParams(location.search).get("id");
+      const $ = (s) => document.querySelector(s);
+      const body = document.body,
+        note = $("#note"),
+        tab = $("#tab");
+      const editor = $("#editor"),
+        menu = $("#menu");
+
+      const PALETTE = [
+        {
+          name: "Classic Yellow",
+          color: "rgba(255, 235, 59, 0.55)",
+          cls: "hl-y",
+        },
+        { name: "Soft Orange", color: "rgba(255, 152, 0, 0.45)", cls: "hl-o" },
+        { name: "Pastel Pink", color: "rgba(233, 30, 99, 0.4)", cls: "hl-p" },
+      ];
+      const HOLD_MS = 500;
+      let hlColor = PALETTE[0].color;
+
+      const clsFor = (color) =>
+        (PALETTE.filter((p) => p.color === color)[0] || PALETTE[0]).cls;
+      function setHl(color) {
+        hlColor = color;
+        document.documentElement.style.setProperty("--hl", color);
+      }
+
+      // ======================================================================
+      //  SAVED-HTML SANITIZER (class-based formatting: no inline style attributes needed)
+      // ======================================================================
+      function parseColor(s) {
+        const m = String(s || "").match(/rgba?\(([^)]+)\)/);
+        if (!m) return null;
+        const p = m[1].split(",").map(parseFloat);
+        return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
+      }
+      function legacySpec(n) {
+        // notes saved by older builds: span[style] -> b / u / mark
+        const s = (n.getAttribute("style") || "").toLowerCase();
+        const spec = [];
+        if (/font-weight:\s*(bold|[6-9]00)/.test(s)) spec.push(["b"]);
+        if (/underline/.test(s)) spec.push(["u"]);
+        const m = s.match(/background-color:\s*(rgba?\([^)]*\))/);
+        if (m) {
+          const c = parseColor(m[1]);
+          if (c && c[3] > 0)
+            spec.push([
+              "mark",
+              c[0] === 255 && c[1] === 152
+                ? "hl-o"
+                : c[0] === 233 && c[1] === 30
+                  ? "hl-p"
+                  : "hl-y",
+            ]);
+        }
+        return spec;
+      }
+      function specFor(n) {
+        const t = n.tagName;
+        if (t === "B" || t === "STRONG") return [["b"]];
+        if (t === "U") return [["u"]];
+        if (t === "I" || t === "EM") return [["i"]];
+        if (t === "BR") return [["br"]];
+        if (t === "DIV" || t === "P") return [["div"]];
+        if (t === "MARK") {
+          const m = /hl-[yop]/.exec(n.className || "");
+          return [["mark", m ? m[0] : "hl-y"]];
+        }
+        if (t === "SPAN") return legacySpec(n);
+        return []; 
+      }
+      function sanitize(html) {
+        const src = document.createElement("template");
+        src.innerHTML = String(html || "");
+        const out = document.createDocumentFragment();
+        (function walk(from, to) {
+          from.childNodes.forEach((n) => {
+            if (n.nodeType === 3) {
+              to.appendChild(document.createTextNode(n.nodeValue));
+              return;
+            }
+            if (
+              n.nodeType !== 1 ||
+              n.tagName === "SCRIPT" ||
+              n.tagName === "STYLE"
+            )
+              return;
+            let host = to;
+            specFor(n).forEach((s) => {
+              const el = document.createElement(s[0]);
+              if (s[1]) el.className = s[1];
+              host.appendChild(el);
+              host = el;
+            });
+            if (n.tagName !== "BR") walk(n, host);
+          });
+        })(src.content, out);
+        return out;
+      }
+
+      // ======================================================================
+      //  THEME / MODE / LOADING
+      // ======================================================================
+      function applyTheme(t) {
+        document.documentElement.dataset.theme = t;
+        document
+          .querySelectorAll("[data-theme-opt]")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.themeOpt === t),
+          );
+      }
+      function applyMode(m) {
+        body.dataset.state = m.state;
+        body.classList.toggle("tab-mode", m.state === "behind");
+        $("#label").textContent = m.label || "note";
+        menu.hidden = true;
+      }
+
+      ipcRenderer.invoke("note:get", id).then((s) => {
+        applyTheme(s.theme);
+        applyMode(s);
+        setHl(s.hl || PALETTE[0].color);
+        body.classList.toggle("dimmed", !!s.dimmed); // opened while another note is being typed in
+        editor.innerHTML = "";
+        if (s.html) editor.appendChild(sanitize(s.html));
+        else editor.textContent = s.text;
+      });
+      ipcRenderer.on("theme:changed", (_, t) => applyTheme(t));
+      ipcRenderer.on("hl:changed", (_, c) => {
+        setHl(c);
+        updateTools();
+      });
+      ipcRenderer.on("mode", (_, m) => applyMode(m));
+
+      function persist() {
+        // every change is streamed to main (notes.json + txt backup)
+        if (editor.innerHTML === "<br>") editor.innerHTML = "";
+        ipcRenderer.send("note:input", id, editor.innerText, editor.innerHTML);
+      }
+      editor.addEventListener("input", persist);
+
+      // ======================================================================
+      //  ACTIVE FOCUS SHADOW + GLOBAL DIMMING
+      // ======================================================================
+      const TYPING_COOLDOWN_MS = 800;
+      let isTyping = false;
+      let typingTimer = null;
+
+      function isTypingKey(e) {
+        if (
+          (e.ctrlKey || e.metaKey || e.altKey) &&
+          !e.getModifierState("AltGraph")
+        )
+          return false;
+        const k = e.key;
+        return (
+          k.length === 1 ||
+          k === "Backspace" ||
+          k === "Delete" ||
+          k === "Enter" ||
+          k === "Dead" ||
+          k === "Process"
+        );
+      }
+
+      function resetTypingLocal() {
+        // local only: used when main already knows the new state
+        clearTimeout(typingTimer);
+        typingTimer = null;
+        isTyping = false;
+        note.classList.remove("typing");
+      }
+
+      function stopTyping() {
+        // cooldown expired (or the window lost focus)
+        clearTimeout(typingTimer);
+        typingTimer = null;
+        if (!isTyping) return;
+        isTyping = false;
+        note.classList.remove("typing"); // transition back to the resting shadow + scale(1)
+        ipcRenderer.send("note-typing-stopped");
+      }
+
+      editor.addEventListener("keydown", (e) => {
+        if (!isTypingKey(e)) return;
+        if (!isTyping) {
+          // rising edge only: one IPC message per typing burst
+          isTyping = true;
+          body.classList.remove("dimmed"); // a dimmed note you start typing in lights up at once
+          note.classList.add("typing"); // deep shadow + scale(1.015)
+          ipcRenderer.send("note-typing");
+        }
+        clearTimeout(typingTimer); // debounce: every key restarts the 800ms window
+        typingTimer = setTimeout(stopTyping, TYPING_COOLDOWN_MS);
+      });
+      window.addEventListener("blur", stopTyping);
+
+      ipcRenderer.on("note-dim-others", () => {
+        resetTypingLocal();
+        body.classList.add("dimmed");
+      });
+      ipcRenderer.on("note-restore", () => body.classList.remove("dimmed"));
+
+      // ======================================================================
+      //  RICH TEXT ENGINE: Selection + Range API only (no document.execCommand)
+      // ======================================================================
+      const FAMILY = { B: ["B", "STRONG"], U: ["U"], MARK: ["MARK"] };
+      let pending = {}; // caret-only typing state: { B: bool, U: bool, MARK: 'hl-y' | false }
+      let pendingAt = null; // caret position the pending state belongs to
+      let lastRange = null; // last selection that lived inside the editor
+
+      function setSelection(range) {
+        const sel = getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      function selRange() {
+        const sel = getSelection();
+        if (!sel.rangeCount) return null;
+        const r = sel.getRangeAt(0);
+        return editor.contains(r.commonAncestorContainer) ? r : null;
+      }
+      function activeRange() {
+        // always returns a usable range inside the editor
+        const r = selRange();
+        if (r) return r;
+        editor.focus();
+        let nr;
+        if (lastRange && editor.contains(lastRange.commonAncestorContainer)) {
+          nr = lastRange.cloneRange();
+        } else {
+          nr = document.createRange();
+          nr.selectNodeContents(editor);
+          nr.collapse(false);
+        }
+        setSelection(nr);
+        return getSelection().getRangeAt(0);
+      }
+
+      function ancestor(node, tags) {
+        for (let n = node; n && n !== editor; n = n.parentNode) {
+          if (n.nodeType === 1 && tags.indexOf(n.tagName) >= 0) return n;
+        }
+        return null;
+      }
+      function containing(range, tag) {
+        // one element of that family wrapping the whole selection
+        const a = ancestor(range.startContainer, FAMILY[tag]);
+        const b = ancestor(range.endContainer, FAMILY[tag]);
+        return a && a === b ? a : null;
+      }
+      const clsOf = (el) => (/hl-[yop]/.exec(el.className || "") || [false])[0];
+      function unwrapNode(n) {
+        const p = n.parentNode;
+        while (n.firstChild) p.insertBefore(n.firstChild, n);
+        p.removeChild(n);
+      }
+
+      // wrap the selection: range.surroundContents(), with an extract/insert fallback
+      // for selections that start or end inside different elements
+      function wrapRange(range, tag, cls) {
+        const el = document.createElement(tag.toLowerCase());
+        if (cls) el.className = cls;
+        try {
+          range.surroundContents(el);
+        } catch (err) {
+          const frag = range.extractContents();
+          el.appendChild(frag);
+          range.insertNode(el);
+        }
+        Array.prototype.slice
+          .call(el.querySelectorAll(FAMILY[tag].join(",")))
+          .forEach(unwrapNode); // no nesting
+        range.selectNodeContents(el);
+        return el;
+      }
+
+      // take the selected part out of its <b>/<u>/<mark>, splitting the element in two around it
+      function unwrapRange(range, el) {
+        const frag = range.extractContents();
+        const tail = document.createRange();
+        tail.setStart(range.startContainer, range.startOffset);
+        tail.setEnd(el, el.childNodes.length);
+        const after = el.cloneNode(false);
+        after.appendChild(tail.extractContents());
+        el.parentNode.insertBefore(after, el.nextSibling);
+
+        const first = frag.firstChild,
+          last = frag.lastChild;
+        el.parentNode.insertBefore(frag, after);
+        const r = document.createRange();
+        r.setStartBefore(after);
+        r.collapse(true);
+        if (first && last) {
+          r.setStartBefore(first);
+          r.setEndAfter(last);
+        }
+        [el, after].forEach((x) => {
+          if (!x.textContent && x.parentNode) x.parentNode.removeChild(x);
+        });
+        return r;
+      }
+
+      // split an ancestor at the caret, leaving the caret outside of it
+      function splitOut(range, el) {
+        const tail = document.createRange();
+        tail.setStart(range.startContainer, range.startOffset);
+        tail.setEnd(el, el.childNodes.length);
+        const after = el.cloneNode(false);
+        after.appendChild(tail.extractContents());
+        el.parentNode.insertBefore(after, el.nextSibling);
+        range.setStartBefore(after);
+        range.collapse(true);
+        [el, after].forEach((x) => {
+          if (!x.textContent && x.parentNode) x.parentNode.removeChild(x);
+        });
+      }
+
+      // style that new characters will get at the caret (pending flag wins over the DOM)
+      function effective(tag, range) {
+        if (pending[tag] !== undefined) return pending[tag];
+        const host = ancestor(range.startContainer, FAMILY[tag]);
+        if (tag === "MARK") return host ? clsOf(host) : false;
+        return !!host;
+      }
+      function toggleTyping(tag, cls, range, force) {
+        // no selection: flip the "next typed characters" flag
+        const cur = effective(tag, range);
+        if (tag === "MARK") pending.MARK = cur === cls && !force ? false : cls;
+        else pending[tag] = !cur;
+        pendingAt = { node: range.startContainer, offset: range.startOffset };
+        updateTools();
+      }
+
+      // B / U / MARK click (force = radial pick: apply that color, never toggle it off)
+      function toggleInline(tag, cls, force) {
+        const range = activeRange();
+        if (range.collapsed) {
+          toggleTyping(tag, cls, range, force);
+          return;
+        }
+        pending = {};
+        pendingAt = null;
+
+        const host = containing(range, tag);
+        let r = range;
+        if (host) {
+          const same = tag !== "MARK" || host.classList.contains(cls);
+          if (!(same && force)) {
+            r = unwrapRange(range, host); // toggle off (or strip the old color)
+            if (!same) wrapRange(r, tag, cls); // ...and put the new color on
+          }
+        } else {
+          wrapRange(range, tag, cls);
+        }
+        setSelection(r);
+        persist();
+        updateTools();
+      }
+
+      // typed characters land inside the active <b>/<u>/<mark> (or outside, if it was toggled off)
+      function typeWithStyle(range, text, want) {
+        const have = (tag) => ancestor(range.startContainer, FAMILY[tag]);
+        let out = null; // outermost wrapper we must leave
+        ["B", "U", "MARK"].forEach((tag) => {
+          const h = have(tag);
+          const keep =
+            tag === "MARK"
+              ? h && want.MARK && h.classList.contains(want.MARK)
+              : h && want[tag];
+          if (h && !keep && (!out || h.contains(out))) out = h;
+        });
+        if (out) splitOut(range, out);
+
+        const chain = [];
+        if (want.B && !have("B")) chain.push(["b"]);
+        if (want.U && !have("U")) chain.push(["u"]);
+        if (want.MARK && !have("MARK")) chain.push(["mark", want.MARK]);
+
+        const textNode = document.createTextNode(text);
+        let outer = textNode;
+        for (let i = chain.length - 1; i >= 0; i--) {
+          const el = document.createElement(chain[i][0]);
+          if (chain[i][1]) el.className = chain[i][1];
+          el.appendChild(outer);
+          outer = el;
+        }
+        range.insertNode(outer);
+        range.setStart(textNode, text.length);
+        range.collapse(true);
+        setSelection(range);
+      }
+
+      editor.addEventListener("beforeinput", (e) => {
+        if (!Object.keys(pending).length) return;
+        if (e.inputType !== "insertText" || !e.data || e.isComposing) {
+          if (e.inputType !== "insertCompositionText") {
+            pending = {};
+            pendingAt = null;
+          }
+          return;
+        }
+        const range = selRange();
+        if (!range || !range.collapsed) {
+          pending = {};
+          pendingAt = null;
+          return;
+        }
+        const want = {
+          B: effective("B", range),
+          U: effective("U", range),
+          MARK: effective("MARK", range),
+        };
+        const hB = ancestor(range.startContainer, FAMILY.B);
+        const hU = ancestor(range.startContainer, FAMILY.U);
+        const hM = ancestor(range.startContainer, FAMILY.MARK);
+        const differs =
+          !!want.B !== !!hB ||
+          !!want.U !== !!hU ||
+          (want.MARK || false) !== (hM ? clsOf(hM) : false);
+        pending = {};
+        pendingAt = null;
+        if (!differs) return; // native typing already lands in the right place
+        e.preventDefault();
+        typeWithStyle(range, e.data, want);
+        persist();
+        updateTools();
+      });
+
+      editor.addEventListener("keydown", (e) => {
+        // Word shortcuts, routed through our engine
+        if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+        const k = e.key.toLowerCase();
+        if (k === "b") {
+          e.preventDefault();
+          toggleInline("B");
+        }
+        if (k === "u") {
+          e.preventDefault();
+          toggleInline("U");
+        }
+      });
+
+      editor.addEventListener("paste", (e) => {
+        // plain text only, inserted through the Range API
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData)
+          .getData("text/plain")
+          .replace(/\r/g, "");
+        const range = activeRange();
+        range.deleteContents();
+        const frag = document.createDocumentFragment();
+        text.split("\n").forEach((line, i) => {
+          if (i) frag.appendChild(document.createElement("br"));
+          frag.appendChild(document.createTextNode(line));
+        });
+        const last = frag.lastChild;
+        range.insertNode(frag);
+        if (last) range.setStartAfter(last);
+        range.collapse(true);
+        setSelection(range);
+        persist();
+      });
+
+      // ---------- toolbar state ----------
+      function updateTools() {
+        const r = selRange();
+        note.classList.toggle("has-sel", !!(r && !r.collapsed));
+        const on = (tag) =>
+          !r ? false : r.collapsed ? !!effective(tag, r) : !!containing(r, tag);
+        $('[data-cmd="bold"]').classList.toggle("on", on("B"));
+        $('[data-cmd="underline"]').classList.toggle("on", on("U"));
+        let mc = false;
+        if (r) {
+          if (r.collapsed) mc = effective("MARK", r);
+          else {
+            const h = containing(r, "MARK");
+            mc = h ? clsOf(h) : false;
+          }
+        }
+        $("#hl-btn").classList.toggle("on", !!mc && mc === clsFor(hlColor));
+      }
+      document.addEventListener("selectionchange", () => {
+        const r = selRange();
+        if (r) {
+          lastRange = r.cloneRange();
+          if (
+            pendingAt &&
+            (r.startContainer !== pendingAt.node ||
+              r.startOffset !== pendingAt.offset)
+          ) {
+            pending = {};
+            pendingAt = null; // caret moved: the typing state no longer applies
+          }
+        }
+        updateTools();
+      });
+
+      // PREVENT FOCUS LOSS: no formatting control ever takes focus from the caret
+      const toolbar = $("#toolbar");
+      toolbar.addEventListener("mousedown", (e) => e.preventDefault());
+      toolbar.addEventListener("click", (e) => {
+        e.preventDefault();
+        const b = e.target.closest("button[data-cmd]");
+        if (b) toggleInline(b.dataset.cmd === "bold" ? "B" : "U");
+      });
+
+      // ======================================================================
+      //  RADIAL HIGHLIGHTER (hold [H] for 500ms)
+      // ======================================================================
+      const SVGNS = "http://www.w3.org/2000/svg";
+      const CX = 66,
+        CY = 66,
+        RO = 64,
+        RI = 20;
+      const radial = $("#radial"),
+        hlBtn = $("#hl-btn"),
+        svg = $("#radial-svg");
+      const pt = (r, th) =>
+        (CX + r * Math.cos(th)).toFixed(2) +
+        "," +
+        (CY - r * Math.sin(th)).toFixed(2);
+      function sectorPath(i) {
+        // 60deg annular sector, left -> right
+        const a0 = Math.PI - (i * Math.PI) / 3,
+          a1 = Math.PI - ((i + 1) * Math.PI) / 3;
+        return (
+          "M" +
+          pt(RO, a0) +
+          " A" +
+          RO +
+          " " +
+          RO +
+          " 0 0 1 " +
+          pt(RO, a1) +
+          " L" +
+          pt(RI, a1) +
+          " A" +
+          RI +
+          " " +
+          RI +
+          " 0 0 0 " +
+          pt(RI, a0) +
+          " Z"
+        );
+      }
+      const segs = PALETTE.map((p, i) => {
+        const g = document.createElementNS(SVGNS, "g");
+        g.setAttribute("class", "seg");
+        const back = document.createElementNS(SVGNS, "path");
+        back.setAttribute("class", "back");
+        back.setAttribute("d", sectorPath(i));
+        const fill = document.createElementNS(SVGNS, "path");
+        fill.setAttribute("class", "fill");
+        fill.setAttribute("d", sectorPath(i));
+        fill.setAttribute("fill", p.color);
+        g.appendChild(back);
+        g.appendChild(fill);
+        svg.appendChild(g);
+        return g;
+      });
+
+      let holdTimer = null,
+        radialOpen = false;
+      function setHot(i) {
+        segs.forEach((g, k) => g.classList.toggle("hot", k === i));
+      }
+      function openRadial() {
+        radialOpen = true;
+        radial.classList.add("open");
+      }
+      function closeRadial() {
+        radialOpen = false;
+        radial.classList.remove("open");
+        setHot(-1);
+      }
+
+      function segmentAt(x, y) {
+        const b = hlBtn.getBoundingClientRect();
+        const cx = b.left + b.width / 2,
+          cy = b.top - 2;
+        const dx = x - cx,
+          dy = cy - y;
+        const dist = Math.hypot(dx, dy);
+        if (dy < -4 || dist < 14 || dist > 84) return -1;
+        const th = Math.atan2(Math.max(dy, 0), dx);
+        return Math.min(2, Math.floor((Math.PI - th) / (Math.PI / 3)));
+      }
+      function trackHold(e) {
+        if (radialOpen) setHot(segmentAt(e.clientX, e.clientY));
+      }
+      function cancelHold() {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+        document.removeEventListener("mouseup", endHold, true);
+        document.removeEventListener("mousemove", trackHold);
+        note.classList.remove("holding");
+        closeRadial();
+      }
+      function endHold(e) {
+        document.removeEventListener("mouseup", endHold, true);
+        document.removeEventListener("mousemove", trackHold);
+        note.classList.remove("holding");
+        if (holdTimer) {
+          // released before 500ms = click: toggle the active color
+          clearTimeout(holdTimer);
+          holdTimer = null;
+          if (hlBtn.contains(e.target))
+            toggleInline("MARK", clsFor(hlColor), false);
+          return;
+        }
+        if (radialOpen) {
+          // released after the fan-out: pick the segment under the cursor
+          const idx = segmentAt(e.clientX, e.clientY);
+          closeRadial();
+          if (idx >= 0) {
+            setHl(PALETTE[idx].color);
+            ipcRenderer.send("hl:set", PALETTE[idx].color);
+            toggleInline("MARK", PALETTE[idx].cls, true);
+          }
+        }
+      }
+      hlBtn.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault(); // caret stays in the editor
+        note.classList.add("holding");
+        holdTimer = setTimeout(() => {
+          holdTimer = null;
+          openRadial();
+        }, HOLD_MS);
+        document.addEventListener("mouseup", endHold, true);
+        document.addEventListener("mousemove", trackHold);
+      });
+      window.addEventListener("blur", cancelHold);
+
+      // ======================================================================
+      //  TOP BAR + MENU (both are absolutely positioned overlays: nothing reflows)
+      // ======================================================================
+      $("#menu-btn").addEventListener("click", (e) => {
+        e.stopPropagation();
+        menu.hidden = !menu.hidden;
+      });
+      $("#add-btn").addEventListener("click", () =>
+        ipcRenderer.send("note:new"),
+      );
+      $("#export-btn").addEventListener("click", () =>
+        ipcRenderer.send("note:export", id),
+      ); // opens the native save dialog
+      document.addEventListener("click", (e) => {
+        if (!menu.contains(e.target)) menu.hidden = true;
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          menu.hidden = true;
+          cancelHold();
+        }
+      });
+      menu.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        if (b.dataset.themeOpt)
+          ipcRenderer.send("theme:set", b.dataset.themeOpt);
+        if (b.dataset.action === "behind")
+          ipcRenderer.send("note:sendBehind", id);
+        if (b.dataset.action === "delete") ipcRenderer.send("note:delete", id); // the only way a note is ever removed
+        menu.hidden = true;
+      });
+
+      // ======================================================================
+      //  TAB: click = bring to front, drag up = card-index pull-out with tear-off
+      // ======================================================================
+      const LIFT_AT = -30; // smooth scale kicks in (main.js eases the window to its -30px peek here)
+      const TEAR_AT = -60; // must match PULL_FREE in main.js
+      const TEAR_MS = 100; // how long .tear-snap plays before the window becomes independent
+      let tabDrag = null;
+      let tearTimer = null;
+
+      function resetTear() {
+        clearTimeout(tearTimer);
+        tearTimer = null;
+        tab.classList.remove("pulled", "lifted", "tear-snap");
+      }
+
+      function commitTear() {
+        tearTimer = null;
+        tab.classList.remove("tear-snap");
+        const d = tabDrag;
+        if (!d) return;
+        d.tearing = false;
+        d.torn = d.lastY - d.sy <= TEAR_AT; // cursor came back down during the snap: not torn after all
+        ipcRenderer.send("pull:move", id, d.lastX, d.lastY);
+      }
+
+      function onTabMove(e) {
+        if (!tabDrag) return;
+        const d = tabDrag;
+        d.lastX = e.screenX;
+        d.lastY = e.screenY;
+
+        if (!d.moved) {
+          if (Math.hypot(e.screenX - d.sx, e.screenY - d.sy) < 4) return;
+          d.moved = true;
+          ipcRenderer.send("pull:start", id, d.sx, d.sy);
+        }
+        if (d.torn) {
+          // already independent: keep following the cursor
+          ipcRenderer.send("pull:move", id, e.screenX, e.screenY);
+          return;
+        }
+        if (d.tearing) return; // snap is playing: the card holds its position
+
+        const dy = e.screenY - d.sy;
+        tab.classList.toggle("pulled", dy < -4);
+        tab.classList.toggle("lifted", dy <= LIFT_AT);
+
+        if (dy <= TEAR_AT) {
+          // threshold broken: rip animation, then ungroup
+          d.tearing = true;
+          tab.classList.remove("pulled", "lifted");
+          tab.classList.add("tear-snap");
+          tearTimer = setTimeout(commitTear, TEAR_MS);
+          return;
+        }
+        ipcRenderer.send("pull:move", id, e.screenX, e.screenY);
+      }
+
+      function onTabUp() {
+        document.removeEventListener("mousemove", onTabMove);
+        document.removeEventListener("mouseup", onTabUp, true);
+        const d = tabDrag;
+        tabDrag = null;
+        if (!d) {
+          resetTear();
+          return;
+        }
+        if (d.tearing) {
+          // released mid-snap: finish the tear at the last position
+          ipcRenderer.send("pull:move", id, d.lastX, d.lastY);
+        }
+        resetTear();
+        if (d.moved) ipcRenderer.send("pull:end", id);
+        else ipcRenderer.send("tab:resurrect", id);
+      }
+
+      tab.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        resetTear();
+        tabDrag = {
+          sx: e.screenX,
+          sy: e.screenY,
+          lastX: e.screenX,
+          lastY: e.screenY,
+          moved: false,
+          tearing: false,
+          torn: false,
+        };
+        document.addEventListener("mousemove", onTabMove);
+        document.addEventListener("mouseup", onTabUp, true);
+      });
+
+      // ---------- click-through for the transparent shadow margin ----------
+      let ignoring = false;
+      document.addEventListener("mousemove", (e) => {
+        const over =
+          e.target && e.target.closest ? e.target.closest(".note, .tab") : null;
+        const want = !over && e.buttons === 0;
+        if (want !== ignoring) {
+          ignoring = want;
+          ipcRenderer.send("mouse:ignore", want);
+        }
+      });
+
+      // ======================================================================
+      //  GLOBAL VACUUM + BURST (all windows run on main's shared clock)
+      // ======================================================================
+      $("#min-btn").addEventListener("click", () =>
+        ipcRenderer.send("vacuum:request"),
+      );
+
+      ipcRenderer.on("vacuum", (_, p) => {
+        setTimeout(
+          () => {
+            menu.hidden = true;
+            cancelHold();
+            resetTypingLocal(); // no typing shadow / dimming survives the vacuum
+            body.classList.remove("dimmed");
+            body.classList.add("vacuum"); // translateY(100vh) scale(0.05) skewX(-15deg), opacity 0
+          },
+          Math.max(0, p.startAt - Date.now()),
+        );
+      });
+
+      // one persistent listener (no per-burst listeners to accumulate)
+      let burstStartTimer = null;
+      let burstFallback = null;
+      function finishBurst() {
+        clearTimeout(burstFallback);
+        burstFallback = null;
+        if (!body.classList.contains("burst")) return;
+        body.classList.remove("burst");
+        ipcRenderer.send("burst-done", id);
+      }
+      document.addEventListener("animationend", (e) => {
+        if (e.animationName === "burst-animation") finishBurst();
+      });
+
+      ipcRenderer.on("burst", (_, p) => {
+        menu.hidden = true;
+        cancelHold();
+        resetTypingLocal();
+        body.classList.remove("vacuum", "dimmed");
+        body.classList.add("cloaked"); // invisible at the bottom edge until the shared start instant
+        clearTimeout(burstStartTimer);
+        burstStartTimer = setTimeout(
+          () => {
+            body.classList.remove("cloaked");
+            body.classList.add("burst");
+            clearTimeout(burstFallback);
+            burstFallback = setTimeout(finishBurst, 700);
+          },
+          Math.max(0, p.startAt - Date.now()),
+        );
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,508 @@
+:root {
+  --hl: rgba(255, 235, 59, 0.55);
+}
+
+:root[data-theme="light"] {
+  --glass: rgba(255, 255, 255, 0.75);
+  --text: #1d1d1f;
+  --muted: rgba(0, 0, 0, 0.45);
+  --border: rgba(255, 255, 255, 0.6);
+  --hover: rgba(0, 0, 0, 0.07);
+  --menu-bg: rgba(255, 255, 255, 0.94);
+  --pill: #55555a;
+  --shadow-rest: 0 12px 40px rgba(0, 0, 0, 0.25);
+  --shadow-typing: 0 24px 70px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme="dark"] {
+  --glass: rgba(25, 25, 25, 0.85);
+  --text: #f5f5f7;
+  --muted: rgba(255, 255, 255, 0.5);
+  --border: rgba(255, 255, 255, 0.1);
+  --hover: rgba(255, 255, 255, 0.1);
+  --menu-bg: rgba(44, 44, 46, 0.97);
+  --pill: #8e8e93;
+  /* same geometry as light mode, heavier alpha so the shadow still reads on dark desktops */
+  --shadow-rest: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --shadow-typing: 0 24px 70px rgba(0, 0, 0, 0.7);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* html/body stay transparent and full-window: the window margins are room for the CSS shadow */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  color: var(--text);
+  user-select: none;
+}
+
+body.tab-mode .note {
+  display: none;
+}
+body:not(.tab-mode) .tab {
+  display: none;
+}
+
+/* ---------- the rounded outermost container ---------- */
+/* Window margins (main.js): left/right 72px, top 48px, bottom 96px. They contain the deepest
+   shadow state (0 24px 70px) so it never gets cut into a rectangle at the window edge. */
+.note {
+  position: fixed;
+  top: 48px; /* MT */
+  left: 72px; /* MX */
+  width: 284px;
+  height: 244px;
+  display: flex;
+  flex-direction: column;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(25px);
+  backdrop-filter: blur(25px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  clip-path: none; /* no clipping paths: the window edge must never read as a rectangle */
+
+  /* resting state */
+  transform: scale(1);
+  box-shadow: var(
+    --shadow-rest
+  ); /* shadow is 100% CSS, the OS shadow is disabled in main.js */
+
+  /* hardware-accelerated, butter-smooth in both directions */
+  transition:
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s ease;
+}
+.note,
+.tab {
+  will-change: transform, opacity;
+}
+
+/* ACTIVE FOCUS SHADOW: while the user types in this note */
+.note.typing {
+  transform: scale(1.015);
+  box-shadow: var(--shadow-typing);
+}
+
+/* DIMMING ECOSYSTEM: this note is NOT the one being typed in. Applied and removed instantly. */
+body.dimmed {
+  --text: #f5f5f7; /* keep text legible on the dark tint, in both themes */
+  --muted: rgba(255, 255, 255, 0.5);
+  --hover: rgba(255, 255, 255, 0.1);
+}
+body.dimmed .note,
+body.dimmed .tab {
+  background: rgba(15, 15, 15, 0.4);
+  -webkit-backdrop-filter: blur(40px);
+  backdrop-filter: blur(40px);
+  opacity: 0.6;
+}
+
+/* VACUUM: one class, switched on at one shared instant in every window */
+body.vacuum .note,
+body.vacuum .tab {
+  animation: vacuum-animation 350ms cubic-bezier(0.6, 0.05, 0.9, 0.5) forwards;
+}
+@keyframes vacuum-animation {
+  from {
+    transform: none;
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100vh) scale(0.05) skewX(-15deg);
+    opacity: 0;
+  }
+}
+
+/* CLOAKED: the instant the burst is announced, before the shared start time (also hides a window
+   that was hidden by the OS without a vacuum). Declared after .dimmed / .typing so it always wins. */
+body.cloaked .note,
+body.cloaked .tab {
+  transform: translateY(100vh) scale(0.05) skewX(-15deg);
+  opacity: 0;
+  transition: none;
+  animation: none;
+}
+
+/* BURST: back up from the bottom edge to the original coordinates */
+body.burst .note,
+body.burst .tab {
+  animation: burst-animation 420ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+@keyframes burst-animation {
+  0% {
+    transform: translateY(100vh) scale(0.05) skewX(-15deg);
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(-14px) scale(1.04) skewX(2deg);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* ---------- top bar ---------- */
+.handle {
+  -webkit-app-region: drag;
+  position: relative;
+  flex: none;
+  height: 34px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end; /* controls grouped on the right */
+}
+/* the pill sits in the dead middle of the bar, independent of the controls */
+.handle > .pill {
+  position: absolute;
+  left: 50%;
+  top: 15px; /* (34 - 4) / 2 */
+  transform: translateX(-50%);
+}
+.pill {
+  flex: none;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--pill);
+}
+.controls {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.ctl {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-family: "Segoe UI", "Segoe UI Symbol", system-ui, sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ctl:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.ctl svg {
+  display: block;
+  pointer-events: none;
+}
+
+/* ---------- dropdown (overlay, never reflows the note) ---------- */
+.menu {
+  -webkit-app-region: no-drag;
+  position: absolute;
+  top: 36px;
+  right: 8px;
+  z-index: 10;
+  min-width: 156px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  background: var(--menu-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.menu[hidden] {
+  display: none;
+}
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.menu button:hover {
+  background: var(--hover);
+}
+.menu .tick {
+  width: 12px;
+  visibility: hidden;
+  font-size: 11px;
+}
+.menu button.active .tick {
+  visibility: visible;
+}
+.menu .danger {
+  color: #ff453a;
+}
+.menu .only-docked {
+  display: none;
+}
+body[data-state="docked"] .menu .only-docked {
+  display: flex;
+}
+.sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--hover);
+}
+
+/* ---------- contenteditable rich text workspace ---------- */
+.editor {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 16px 48px;
+  outline: none;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  user-select: text;
+  word-wrap: break-word;
+}
+.editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  pointer-events: none;
+}
+.editor b,
+.editor strong {
+  font-weight: 700;
+}
+.editor u {
+  text-decoration: underline;
+}
+
+/* <mark> highlighter: pastel paper tones */
+.editor mark {
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 3px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.editor mark.hl-y {
+  background-color: rgba(255, 235, 59, 0.55);
+}
+.editor mark.hl-o {
+  background-color: rgba(255, 152, 0, 0.45);
+}
+.editor mark.hl-p {
+  background-color: rgba(233, 30, 99, 0.4);
+}
+
+.editor::-webkit-scrollbar {
+  width: 6px;
+}
+.editor::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 3px;
+}
+
+/* ---------- floating micro-toolbar ---------- */
+.toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--menu-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transform: translate(-50%, 6px);
+  pointer-events: none;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+.note:hover .toolbar,
+.note.has-sel .toolbar,
+.note.holding .toolbar {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+.toolbar button {
+  width: 28px;
+  height: 24px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.toolbar button:hover {
+  background: var(--hover);
+}
+.toolbar button.on {
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px var(--muted);
+}
+
+.toolbar .hl {
+  background: var(--hl);
+  color: #1d1d1f;
+  font-weight: 700;
+}
+.toolbar .hl:hover {
+  background: var(--hl);
+  filter: brightness(0.95);
+}
+.toolbar .hl.on {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+
+/* ---------- radial highlighter (180-degree fan above [H]) ---------- */
+.hl-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.radial {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  width: 132px;
+  height: 66px;
+  margin-left: -66px;
+  transform-origin: 50% 100%;
+  transform: scale(0.3);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.9, 0.3, 1.25),
+    opacity 180ms ease,
+    visibility 0s linear 220ms;
+}
+.radial.open {
+  transform: none;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s, 0s, 0s;
+}
+.radial svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25));
+}
+.radial .seg {
+  transform-origin: 66px 66px;
+  transform: rotate(-70deg);
+  opacity: 0;
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    opacity 200ms ease;
+}
+.radial.open .seg {
+  transform: none;
+  opacity: 1;
+}
+.radial.open .seg:nth-child(2) {
+  transition-delay: 40ms;
+}
+.radial.open .seg:nth-child(3) {
+  transition-delay: 80ms;
+}
+.radial .seg .back {
+  fill: var(--menu-bg);
+}
+.radial .seg .fill {
+  stroke: var(--menu-bg);
+  stroke-width: 1.5;
+}
+.radial.open .seg.hot {
+  transform: scale(1.07);
+  transition-delay: 0s;
+}
+.radial .seg.hot .fill {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+/* ---------- collapsed "behind layer" card tab / index row ---------- */
+/* The tab window has 24px side + bottom margins and a 20px top margin (see main.js),
+   so the 15px blur of the shadow below always fades out inside the window. */
+.tab {
+  position: fixed;
+  top: 20px; /* TAB_MT */
+  left: 24px; /* TAB_MX */
+  width: 180px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 12px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(25px);
+  backdrop-filter: blur(25px);
+  border: 1px solid var(--border);
+  border-radius: 12px 12px 0 0; /* rounded top, flush with the note below */
+  overflow: hidden;
+  clip-path: none; /* no clipping paths */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); /* pure CSS shadow, the OS shadow is disabled in main.js */
+  cursor: grab;
+  -webkit-app-region: no-drag;
+  transition:
+    transform 180ms cubic-bezier(0.25, 1, 0.5, 1),
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+.tab:hover {
+  background: var(--menu-bg);
+}
+.tab.pulled {
+  cursor: grabbing;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.26); /* still fits inside the window margins */
+}
+/* card lifted out of the box (-30px peek): smooth scale-up */
+.tab.lifted {
+  transform: scale(1.03);
+}
+
+/* tear-off: plays for exactly 100ms when the pull passes -60px, right before the note goes independent */
+.tear-snap {
+  transform: scale(1.02) rotate(2deg);
+  opacity: 0.9;
+  transition: all 0.1s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.tab .label {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text);
+}

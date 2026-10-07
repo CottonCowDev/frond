@@ -1,0 +1,36 @@
+{
+  "name": "frond",
+  "productName": "Frond",
+  "version": "1.0.0",
+  "description": "Hyper-private, 100% offline sticky notes for heavy multitaskers.",
+  "author": "CottonCow CottonCow@protonmail.com",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.cottoncow.frond",
+    "productName": "Frond",
+    "copyright": "Copyright © 2026 CottonCow",
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Frond"
+    },
+    "files": [
+      "**/*",
+      "!bunker_data/*",
+      "!notes.json",
+      "!.tmp",
+      "!.bak"
+    ]
+  }
+}
