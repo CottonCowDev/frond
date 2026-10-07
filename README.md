@@ -8,6 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-2E7D32?style=for-the-badge)](LICENSE)
 [![Platform: Windows x64](https://img.shields.io/badge/platform-Windows%20x64-1B5E20?style=for-the-badge&logo=windows&logoColor=white)](https://cottoncowdev.github.io)
+> **Windows 10/11 (x64) only for now.** macOS and Linux builds are not available.
 [![Built with Electron](https://img.shields.io/badge/built%20with-Electron-10B981?style=for-the-badge&logo=electron&logoColor=white)](https://www.electronjs.org)
 
 ### [⬇&nbsp;&nbsp;Download Frond for Windows](https://cottoncowdev.github.io)
