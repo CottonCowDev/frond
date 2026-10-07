@@ -22,7 +22,7 @@
 
 ## The Idea
 
-When you open a sticky note, you just want to see your text **right now**. You shouldn't need an account, a sync service, or a distant server just to remember to "call Martin back."
+When you open a sticky note, you just want to see your text **right now**. You shouldn't need an account, a sync service, or a distant server just to remember to "call John back."
 
 Most note apps are built the other way around: sign in, sync, update, sign in again. Frond is built on a simpler idea:
 
