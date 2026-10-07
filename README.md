@@ -20,7 +20,7 @@
 
 ---
 
-## The Manifesto
+## The Idea
 
 When you open a sticky note, you just want to see your text **right now**. You shouldn't need an account, a sync service, or a distant server just to remember to "call Martin back."
 
@@ -39,7 +39,7 @@ Frond is for people who keep a dozen things open at once and want their notes to
 
 ## Features
 
-### 🌿 Active Focus Shadow & Ecosystem Blur
+### Active Focus Shadow & Ecosystem Blur
 
 Frond notices when you type and uses that behavior to protect your focus.
 
@@ -49,7 +49,7 @@ Frond notices when you type and uses that behavior to protect your focus.
 *   This feature is highly optimized. Frond sends **one** background communication message per typing burst, not one per keystroke. The main background process tracks a single active note, ensuring smooth handoffs without visual glitches.
 *   It supports international keyboards: dead keys, special input methods, and **AltGr** modifiers (like the `@ # { } \` keys on European layouts) all count as typing. Keyboard shortcuts like `Ctrl+B` do not.
 
-### 👻 The Ghost Host: 1 to 50 notes, ONE taskbar icon
+### The Ghost Host: 1 to 50 notes, ONE taskbar icon
 
 Window clutter is what ruins most sticky-note apps. Frond solves this problem directly through its core architecture:
 
@@ -59,7 +59,7 @@ Window clutter is what ruins most sticky-note apps. Frond solves this problem di
 *   A note window cannot be closed by accident. Standard exit shortcuts like `Alt+F4` are blocked, meaning a note only leaves your desktop when you explicitly choose to **Delete note**.
 *   Opening a second copy of Frond simply brings the existing instance to the front. The two versions will never conflict or fight over your data.
 
-### 🗂️ Mechanical Card Index Physics
+### Mechanical Card Index Physics
 
 Notes behave like physical cards in an office filing system:
 
